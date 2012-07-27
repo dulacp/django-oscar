@@ -17,12 +17,14 @@ def currency(value):
         
     # We allow the currency symbol to be overridden    
     symbol = getattr(settings, 'CURRENCY_SYMBOL', None)
+
     try:
         if symbol:
-            return u"%s%s" % (symbol, locale.format("%.2f", value, grouping=True))
+            # And we allow the currency format to be overriden too
+            format = getattr(settings, 'CURRENCY_FORMAT', u"%(currency_symbol)s%(value_localized)s")
+            return format % {'currency_symbol':symbol, 'value_localized':locale.format("%.2f", value, grouping=True)}
         else:
             c = locale.currency(value, symbol=True, grouping=True)
             return unicode(c, 'utf8')
     except TypeError:
         return '' 
-        
