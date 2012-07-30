@@ -32,9 +32,12 @@ class ClientTestCase(TestCase):
     def setUp(self):
         self.client = Client()
         if not self.is_anonymous:
-            self.user = self.create_user()
-            self.client.login(username=self.username,
-                              password=self.password)
+            self.login()
+
+    def login(self):
+        self.user = self.create_user()
+        self.client.login(username=self.username,
+                          password=self.password)
 
     def create_user(self):
         user = User.objects.create_user(self.username,
@@ -52,10 +55,10 @@ class ClientTestCase(TestCase):
             location = URL.from_string(response['Location'])
             self.assertEqual(expected_url, location.path())
 
-    def assertRedirectUrlName(self, response, name):
+    def assertRedirectUrlName(self, response, name, kwargs=None):
         self.assertIsRedirect(response)
         location = response['Location'].replace('http://testserver', '')
-        self.assertEqual(location, reverse(name))
+        self.assertEqual(location, reverse(name, kwargs=kwargs))
 
     def assertIsOk(self, response):
         self.assertEqual(httplib.OK, response.status_code)

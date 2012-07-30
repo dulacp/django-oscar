@@ -23,8 +23,8 @@ Dispatcher = get_class('customer.utils', 'Dispatcher')
 RedirectRequired, UnableToTakePayment, PaymentError = get_classes(
     'payment.exceptions', ['RedirectRequired', 'UnableToTakePayment', 'PaymentError'])
 UnableToPlaceOrder = get_class('order.exceptions', 'UnableToPlaceOrder')
-CheckoutSessionMixin, OrderPlacementMixin = get_classes('checkout.mixins',
-    ('CheckoutSessionMixin', 'OrderPlacementMixin'))
+OrderPlacementMixin = get_class('checkout.mixins', 'OrderPlacementMixin')
+CheckoutSessionMixin = get_class('checkout.session', 'CheckoutSessionMixin')
 
 Order = get_model('order', 'Order')
 ShippingAddress = get_model('order', 'ShippingAddress')
@@ -327,13 +327,15 @@ class PaymentMethodView(CheckoutSessionMixin, TemplateView):
             messages.error(request, _("You need to add some items to your basket to checkout"))
             return HttpResponseRedirect(reverse('basket:summary'))
 
+        shipping_required = request.basket.is_shipping_required()
+
         # Check that shipping address has been completed
-        if request.basket.is_shipping_required() and not self.checkout_session.is_shipping_address_set():
+        if shipping_required and not self.checkout_session.is_shipping_address_set():
             messages.error(request, _("Please choose a shipping address"))
             return HttpResponseRedirect(reverse('checkout:shipping-address'))
 
         # Check that shipping method has been set
-        if not self.checkout_session.is_shipping_method_set():
+        if shipping_required and not self.checkout_session.is_shipping_method_set():
             messages.error(request, _("Please choose a shipping method"))
             return HttpResponseRedirect(reverse('checkout:shipping-method'))
 
@@ -356,7 +358,7 @@ class PaymentDetailsView(OrderPlacementMixin, TemplateView):
     thing.  This is to make it easier to subclass and override just one component of
     functionality.
 
-    Almost all projects will need to subclass and customise this class.
+    All projects will need to subclass and customise this class.
     """
     template_name = 'checkout/payment_details.html'
     template_name_preview = 'checkout/preview.html'
@@ -370,12 +372,14 @@ class PaymentDetailsView(OrderPlacementMixin, TemplateView):
         if self.request.basket.is_empty:
             messages.error(self.request, _("You need to add some items to your basket to checkout"))
             return HttpResponseRedirect(reverse('basket:summary'))
+
+        shipping_required = self.request.basket.is_shipping_required()
         # Check that shipping address has been completed
-        if self.request.basket.is_shipping_required() and not self.checkout_session.is_shipping_address_set():
+        if shipping_required and not self.checkout_session.is_shipping_address_set():
             messages.error(self.request, _("Please choose a shipping address"))
             return HttpResponseRedirect(reverse('checkout:shipping-address'))
         # Check that shipping method has been set
-        if not self.checkout_session.is_shipping_method_set():
+        if shipping_required and not self.checkout_session.is_shipping_method_set():
             messages.error(self.request, _("Please choose a shipping method"))
             return HttpResponseRedirect(reverse('checkout:shipping-method'))
 
@@ -392,7 +396,7 @@ class PaymentDetailsView(OrderPlacementMixin, TemplateView):
         then the method can call submit()
         """
         error_response = self.get_error_response()
-        
+
         if error_response:
             return error_response
         if self.preview:

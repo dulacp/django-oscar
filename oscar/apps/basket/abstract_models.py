@@ -3,6 +3,8 @@ import zlib
 import datetime
 
 from django.db import models
+from django.db.models import query
+from django.conf import settings
 from django.utils.translation import ugettext as _
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 
@@ -63,9 +65,25 @@ class AbstractBasket(models.Model):
         This is important for offers as they alter the line models and you don't
         want to reload them from the DB.
         """
+        if self.id is None:
+            return query.EmptyQuerySet(model=self.__class__)
         if self._lines is None:
             self._lines = self.lines.all()
         return self._lines
+
+    def is_quantity_allowed(self, qty):
+        basket_threshold = settings.OSCAR_MAX_BASKET_QUANTITY_THRESHOLD
+        if basket_threshold:
+            total_basket_quantity = self.num_items
+            max_allowed = basket_threshold - total_basket_quantity
+            if qty > max_allowed:
+                return False, _("Due to technical limitations we are not able "
+                                "to ship more than %(threshold)d items in one order."
+                                " Your basket currently has %(basket)d items.") % {
+                                        'threshold': basket_threshold,
+                                        'basket': total_basket_quantity,
+                                    }
+        return True, None
 
     # ============
     # Manipulation
@@ -75,7 +93,7 @@ class AbstractBasket(models.Model):
         """Remove all lines from basket."""
         if self.status == FROZEN:
             raise PermissionDenied("A frozen basket cannot be flushed")
-        self.lines_all().delete()
+        self.lines.all().delete()
         self._lines = None
 
     def add_product(self, product, quantity=1, options=None):
@@ -90,7 +108,7 @@ class AbstractBasket(models.Model):
         if not self.id:
             self.save()
 
-        # Line reference is used to distinguish between variations of the same 
+        # Line reference is used to distinguish between variations of the same
         # product (eg T-shirts with different personalisations)
         line_ref = self._create_line_reference(product, options)
 
@@ -237,8 +255,10 @@ class AbstractBasket(models.Model):
 
     @property
     def is_empty(self):
-        """Return bool based on basket having 0 lines"""
-        return self.num_lines == 0
+        """
+        Test if this basket is empty
+        """
+        return self.id is None or self.num_lines == 0
 
     @property
     def total_excl_tax(self):
@@ -319,7 +339,7 @@ class AbstractBasket(models.Model):
     @property
     def num_lines(self):
         """Return number of lines"""
-        return self.all_lines().count()
+        return len(self.all_lines())
 
     @property
     def num_items(self):
@@ -546,6 +566,10 @@ class AbstractLine(models.Model):
         """
         if not self.price_incl_tax:
             return
+        if not self.product.has_stockrecord:
+            msg = u"'%(product)s' is no longer available"
+            return _(msg) % {'product': self.product.get_title()}
+
         current_price_incl_tax = self.product.stockrecord.price_incl_tax
         if current_price_incl_tax > self.price_incl_tax:
             msg = u"The price of '%(product)s' has increased from %(old_price)s " \

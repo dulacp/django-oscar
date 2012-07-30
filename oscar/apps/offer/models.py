@@ -251,7 +251,8 @@ class Benefit(models.Model):
             desc = _("%(value).2f discount on %(range)s") % {'value': float(self.value),
                                                              'range': unicode(self.range).lower()}
 
-        desc += ungettext(" (max 1 item)", " (max %d items)", self.max_affected_items)
+        if self.max_affected_items:
+            desc += ungettext(" (max 1 item)", " (max %d items)", self.max_affected_items) % self.max_affected_items
 
         return desc
 
@@ -751,7 +752,3 @@ class MultibuyDiscountBenefit(Benefit):
         else:
             free_line.discount(discount, 0)
         return self.round(discount)
-
-
-# We need to import receivers at the bottom of this script
-from oscar.apps.offer.receivers import receive_basket_voucher_change

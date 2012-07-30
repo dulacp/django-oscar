@@ -107,7 +107,7 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     'oscar.apps.promotions.context_processors.promotions',
     'oscar.apps.checkout.context_processors.checkout',
     'oscar.core.context_processors.metadata',
-) 
+)
 
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
@@ -125,11 +125,10 @@ INTERNAL_IPS = ('127.0.0.1',)
 
 ROOT_URLCONF = 'urls'
 
-from oscar import OSCAR_PARENT_TEMPLATE_DIR
+from oscar import OSCAR_MAIN_TEMPLATE_DIR
 TEMPLATE_DIRS = (
     location('templates'),
-    os.path.join(OSCAR_PARENT_TEMPLATE_DIR, 'templates'),
-    OSCAR_PARENT_TEMPLATE_DIR,
+    OSCAR_MAIN_TEMPLATE_DIR,
 )
 
 # A sample logging configuration. The only tangible logging
@@ -230,8 +229,12 @@ LOGIN_REDIRECT_URL = '/accounts/'
 APPEND_SLASH = True
 
 # Haystack settings
-HAYSTACK_SITECONF = 'oscar.search_sites'
-HAYSTACK_SEARCH_ENGINE = 'dummy'
+HAYSTACK_CONNECTIONS = {
+    'default': {
+        'ENGINE': 'haystack.backends.whoosh_backend.WhooshEngine',
+        'PATH': os.path.join(os.path.dirname(__file__), 'whoosh_index'),
+    },
+}
 
 DEBUG_TOOLBAR_CONFIG = {
     'INTERCEPT_REDIRECTS': False

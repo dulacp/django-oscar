@@ -1,10 +1,10 @@
 import os
 
 from django.conf import settings, global_settings
-from oscar import OSCAR_CORE_APPS
+from oscar import OSCAR_CORE_APPS, OSCAR_MAIN_TEMPLATE_DIR
 
 
-def configure():
+def configure(nose_args):
     if not settings.configured:
         from oscar.defaults import OSCAR_SETTINGS
 
@@ -41,6 +41,7 @@ def configure():
                 ),
             TEMPLATE_DIRS=(
                 location('templates'),
+                OSCAR_MAIN_TEMPLATE_DIR,
                 ),
             MIDDLEWARE_CLASSES=global_settings.MIDDLEWARE_CLASSES + (
                 'oscar.apps.basket.middleware.BasketMiddleware',
@@ -49,13 +50,16 @@ def configure():
                 'oscar.apps.customer.auth_backends.Emailbackend',
                 'django.contrib.auth.backends.ModelBackend',
                 ),
+            HAYSTACK_CONNECTIONS={
+                'default': {
+                    'ENGINE': 'haystack.backends.simple_backend.SimpleEngine',
+                }
+            },
             ROOT_URLCONF='tests.site.urls',
             LOGIN_REDIRECT_URL='/accounts/',
             DEBUG=False,
             SITE_ID=1,
-            HAYSTACK_SEARCH_ENGINE='dummy',
-            HAYSTACK_SITECONF = 'oscar.search_sites',
             APPEND_SLASH=True,
-            NOSE_ARGS=['-s', '-x', '--with-spec'],
+            NOSE_ARGS=nose_args,
             **OSCAR_SETTINGS
         )

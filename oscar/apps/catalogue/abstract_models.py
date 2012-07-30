@@ -27,7 +27,7 @@ class AbstractProductClass(models.Model):
     # Some product type don't require shipping (eg digital products) - we use
     # this field to take some shortcuts in the checkout.
     requires_shipping = models.BooleanField(_("Requires shipping?"), default=True)
-    
+
     # These are the options (set by the user when they add to basket) for this
     # item class.  For instance, a product class of "SMS message" would always
     # require a message to be specified before it could be bought.
@@ -51,7 +51,7 @@ class AbstractProductClass(models.Model):
 class AbstractCategory(MP_Node):
     """
     A product category.
-    
+
     Uses django-treebeard.
     """
     name = models.CharField(_('name'), max_length=255, db_index=True)
@@ -62,10 +62,10 @@ class AbstractCategory(MP_Node):
 
     _slug_separator = '/'
     _full_name_separator = ' > '
-    
+
     def __unicode__(self):
         return self.full_name
-    
+
     def save(self, update_slugs=True, *args, **kwargs):
         if update_slugs:
             parent = self.get_parent()
@@ -152,7 +152,10 @@ class AbstractCategory(MP_Node):
         verbose_name_plural = _('Categories')
 
     def has_children(self):
-        return self.get_children().count() > 0
+        return self.get_num_children() > 0
+
+    def get_num_children(self):
+        return self.get_children().count()
 
 
 class AbstractProductCategory(models.Model):
@@ -302,8 +305,10 @@ class AbstractProduct(models.Model):
 
     @property
     def is_top_level(self):
-        u"""Return True if this is a parent product"""
-        return self.parent_id == None
+        """
+        Test if this product is a parent (who may or may not have children)
+        """
+        return self.parent_id is None
 
     @property
     def is_group(self):
@@ -323,18 +328,27 @@ class AbstractProduct(models.Model):
         return True
 
     @property
+    def is_available_to_buy(self):
+        """
+        Test whether to show an add-to-basket button for this product
+        """
+        if self.is_group:
+            return True
+        return self.has_stockrecord and self.stockrecord.is_available_to_buy
+
+    @property
     def min_variant_price_incl_tax(self):
-        u"""Return minimum variant price including tax"""
+        """Return minimum variant price including tax"""
         return self._min_variant_price('price_incl_tax')
 
     @property
     def min_variant_price_excl_tax(self):
-        u"""Return minimum variant price excluding tax"""
+        """Return minimum variant price excluding tax"""
         return self._min_variant_price('price_excl_tax')
 
     @property
     def has_stockrecord(self):
-        u"""Return True if a product has a stock record, False if not"""
+        """Return True if a product has a stock record, False if not"""
         try:
             self.stockrecord
             return True
