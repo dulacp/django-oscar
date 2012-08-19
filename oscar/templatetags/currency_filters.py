@@ -5,6 +5,7 @@ from django.conf import settings
 
 register = template.Library()
 
+
 @register.filter(name='currency')
 def currency(value):
     """
@@ -28,4 +29,3 @@ def currency(value):
             return unicode(c, 'utf8')
     except TypeError:
         return '' 
-

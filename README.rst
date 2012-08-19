@@ -5,12 +5,12 @@ Domain-driven e-commerce for Django
 ===================================
 
 Oscar is an e-commerce framework for Django designed for building domain-driven
-e-commerce sites.  It is structured such that any part of the core functionality
+sites.  It is structured such that any part of the core functionality
 can be customised to suit the needs of your project.  This allows it to handle a
 wide range of e-commerce requirements, from large-scale B2C sites to complex B2B
 sites rich in domain-specific business logic.
 
-More information:
+Further reading:
 
 * `Official homepage`_ 
 * `Sandbox site`_ (an hourly build of the unstable master branch - it's
@@ -21,6 +21,10 @@ More information:
 * `Continuous integration homepage`_ on `travis-ci.org`_
 * `Twitter account for news and updates`_
 * `Twitter account of all commits`_
+* `crate.io page`_
+* `PyPI page`_
+
+Continuous integration status:
 
 .. image:: https://secure.travis-ci.org/tangentlabs/django-oscar.png
 
@@ -33,10 +37,14 @@ More information:
 .. _`Twitter account for news and updates`: https://twitter.com/#!/django_oscar
 .. _`Twitter account of all commits`: https://twitter.com/#!/oscar_django
 .. _`Google Group`: https://groups.google.com/forum/?fromgroups#!forum/django-oscar
+.. _`crate.io page`: https://crate.io/packages/django-oscar/
+.. _`PyPI page`: http://pypi.python.org/pypi/django-oscar/
 
 Oscar was written by `David Winterbottom`_ (`@codeinthehole`_) and is developed
 and maintained by `Tangent Labs`_, a London-based digital agency, with help from
-`Mirumee`.
+`Mirumee`_.
+
+.. _`Mirumee`: http://mirumee.com/
 
 .. _`David Winterbottom`: http://codeinthehole.com
 .. _`@codeinthehole`: https://twitter.com/codeinthehole
