@@ -621,6 +621,8 @@ class AbstractProductAttribute(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = slugify(self.name)
         super(AbstractProductAttribute, self).save(*args, **kwargs)
 
     def save_value(self, product, value):
