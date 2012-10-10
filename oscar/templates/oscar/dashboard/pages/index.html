@@ -65,17 +65,18 @@
 </table>
 
 {% if page_obj %}
-    {% include "catalogue/partials/pagination.html" %}
+    {% include "partials/pagination.html" %}
 {% endif %}
 </form>
 
-<a class="btn btn-primary btn-large" href="{% url dashboard:page-create %}">{% trans "Create new page" %}</a>
 
 {% else %}
 
 <p>{% trans "No pages found." %}</p>
 
 {% endif %}
+
+<a class="btn btn-primary btn-large" href="{% url dashboard:page-create %}">{% trans "Create new page" %}</a>
 
 {% endblock dashboard_content %}
 

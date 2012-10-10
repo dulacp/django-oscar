@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal as D
 
 from django.test import TestCase
 from django.test.client import RequestFactory
@@ -8,9 +9,10 @@ from oscar.apps.basket.middleware import BasketMiddleware
 from oscar.test.helpers import create_product
 from oscar.apps.basket.reports import (
     OpenBasketReportGenerator, SubmittedBasketReportGenerator)
+from oscar.apps.catalogue.models import Option
 
 
-class TestBasketModel(TestCase):
+class TestABasket(TestCase):
 
     def setUp(self):
         self.basket = Basket()
@@ -35,11 +37,35 @@ class TestBasketModel(TestCase):
         self.basket.add_product(self.product)
         self.assertTrue(self.basket.num_lines == 1)
 
+    def test_add_product_sets_line_prices(self):
+        self.basket.add_product(self.product)
+        basket_line = self.basket.lines.all()[0]
+        self.assertEqual(basket_line.price_incl_tax, D('10.00'))
+        self.assertEqual(basket_line.price_excl_tax, D('10.00'))
+
     def test_flushing_basket_removes_all_lines(self):
         self.basket.add_product(self.product, 10)
         self.assertEqual(self.basket.num_items, 10)
         self.basket.flush()
         self.assertEqual(self.basket.num_items, 0)
+
+    def test_returns_correct_quantity_for_missing_product(self):
+        self.assertEqual(0, self.basket.line_quantity(self.product))
+
+    def test_returns_correct_quantity_for_existing_product(self):
+        self.basket.add_product(self.product)
+        self.assertEqual(1, self.basket.line_quantity(self.product))
+
+    def test_returns_correct_quantity_for_existing_product_with_options(self):
+        option = Option.objects.create(name="Message")
+        options = [{"option": option, "value": "2"}]
+        self.basket.add_product(self.product, options=options)
+        self.assertEqual(0, self.basket.line_quantity(self.product))
+        self.assertEqual(1, self.basket.line_quantity(self.product, options))
+
+    def test_has_method_to_test_if_submitted(self):
+        self.basket.set_as_submitted()
+        self.assertTrue(self.basket.is_submitted())
 
 
 class TestBasketMiddleware(TestCase):

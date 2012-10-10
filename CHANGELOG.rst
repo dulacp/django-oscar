@@ -2,11 +2,23 @@
 Changelog
 =========
 
-0.3.2
------
+0.4 (not released yet)
+----------------------
+* Better support for digital products.  Additional fields added to product class
+  model.
+* Major refactor of the offers module and test suite  
+* Product stock alerts
 
-* Bug fix for basket calculations
-* Bug fix for absolute discount benefit calculations
+0.3.3 - 2012-08-24
+-------------------
+
+* Minor bug fixes around category editing and order history.
+
+0.3.2 - 2012-08-13
+------------------
+
+* Bug fix for basket calculations.
+* Bug fix for absolute discount benefit calculations.
 
 0.3.1 - 2012-08-08
 ------------------

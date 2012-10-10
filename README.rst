@@ -5,9 +5,9 @@ Domain-driven e-commerce for Django
 ===================================
 
 Oscar is an e-commerce framework for Django designed for building domain-driven
-sites.  It is structured such that any part of the core functionality
-can be customised to suit the needs of your project.  This allows it to handle a
-wide range of e-commerce requirements, from large-scale B2C sites to complex B2B
+sites.  It is structured such that any part of the core functionality can be
+customised to suit the needs of your project.  This allows a wide range of
+e-commerce requirements to be handled, from large-scale B2C sites to complex B2B
 sites rich in domain-specific business logic.
 
 Further reading:
@@ -54,13 +54,21 @@ and maintained by `Tangent Labs`_, a London-based digital agency, with help from
 Extensions
 ----------
 
+The following extensions are stable and ready for use:
+
 * django-oscar-datacash_ - Integration with the DataCash_ payment gateway
 * django-oscar-paypal_ - Integration with PayPal.  This currently supports both
   `Express Checkout`_ and `PayFlow Pro`_.
 * django-oscar-gocardless_ - Integration with the GoCardless_ payment gateway
 * django-oscar-jirafe_ - Integration with the Jirafe_ analytics package
+* django-oscar-paymentexpress_ - Integration with the `Payment Express`_ payment
+  gateway
+* django-oscar-accounts_ - Managed accounts (can be used for giftcard
+  functionality and loyalty schemes)
 
 .. _django-oscar-datacash: https://github.com/tangentlabs/django-oscar-datacash
+.. _django-oscar-paymentexpress: https://github.com/tangentlabs/django-oscar-paymentexpress
+.. _`Payment Express`: http://www.paymentexpress.com
 .. _DataCash: http://www.datacash.com/
 .. _django-oscar-paypal: https://github.com/tangentlabs/django-oscar-paypal
 .. _`Express Checkout`: https://www.paypal.com/uk/cgi-bin/webscr?cmd=_additional-payment-ref-impl1
@@ -69,6 +77,20 @@ Extensions
 .. _GoCardless: https://gocardless.com/
 .. _django-oscar-jirafe: https://github.com/tangentlabs/django-oscar-jirafe
 .. _Jirafe: https://jirafe.com/
+.. _django-oscar-accounts: https://github.com/tangentlabs/django-oscar-accounts
+
+The following extensions are in development:
+
+* django-oscar-stores_ - Physical stores integration (opening hours, store
+  locator etc)
+* django-oscar-parachute_ - Import scripts for migrating away from non-Oscar
+  platforms.
+* django-oscar-approval_ - Approval workflow for authorising new
+  orders/products.
+
+.. _django-oscar-stores: https://github.com/tangentlabs/django-oscar-stores
+.. _django-oscar-parachute: https://github.com/tangentlabs/django-oscar-parachute
+.. _django-oscar-approval: https://github.com/tangentlabs/django-oscar-approval
 
 License
 -------

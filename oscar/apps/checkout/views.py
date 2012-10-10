@@ -96,9 +96,9 @@ class ShippingAddressView(CheckoutSessionMixin, FormView):
     automatically converted into a SHIPPING address when the user checks out.
 
     Alternatively, the user can enter a SHIPPING address directly which will be
-    saved in the session and saved as a model when the order is sucessfully submitted.
+    saved in the session and later saved as ShippingAddress model when the order
+    is sucessfully submitted.
     """
-
     template_name = 'checkout/shipping_address.html'
     form_class = ShippingAddressForm
 
@@ -136,13 +136,16 @@ class ShippingAddressView(CheckoutSessionMixin, FormView):
 
     def post(self, request, *args, **kwargs):
         # Check if a shipping address was selected directly (eg no form was filled in)
-        if self.request.user.is_authenticated and 'address_id' in self.request.POST:
-            address = UserAddress._default_manager.get(pk=self.request.POST['address_id'])
-            if 'action' in self.request.POST and self.request.POST['action'] == 'ship_to':
+        if self.request.user.is_authenticated() and 'address_id' in self.request.POST:
+            address = UserAddress._default_manager.get(pk=self.request.POST['address_id'],
+                                                       user=self.request.user)
+            action = self.request.POST.get('action', None)
+            if action == 'ship_to':
                 # User has selected a previous address to ship to
                 self.checkout_session.ship_to_user_address(address)
                 return HttpResponseRedirect(self.get_success_url())
-            elif 'action' in self.request.POST and self.request.POST['action'] == 'delete':
+            elif action == 'delete':
+                # Delete the selected address
                 address.delete()
                 messages.info(self.request, _("Address deleted from your address book"))
                 return HttpResponseRedirect(reverse('checkout:shipping-method'))
@@ -238,7 +241,7 @@ class ShippingMethodView(CheckoutSessionMixin, TemplateView):
     automatically selected.  Otherwise, a page is rendered where
     the user can choose the appropriate one.
     """
-    template_name = 'checkout/shipping_methods.html';
+    template_name = 'checkout/shipping_methods.html'
 
     def get(self, request, *args, **kwargs):
         # Check that the user's basket is not empty
@@ -452,11 +455,17 @@ class PaymentDetailsView(OrderPlacementMixin, TemplateView):
 
         The process runs as follows:
          * Generate an order number
-         * Freeze the basket so it cannot be modified any more.
+         * Freeze the basket so it cannot be modified any more (important when
+           redirecting the user to another site for payment as it prevents the
+           basket being manipulated during the payment process).
          * Attempt to take payment for the order
            - If payment is successful, place the order
            - If a redirect is required (eg PayPal, 3DSecure), redirect
            - If payment is unsuccessful, show an appropriate error message
+
+        :basket: The basket to submit.
+        :payment_kwargs: Additional kwargs to pass to the handle_payment method.
+        :order_kwargs: Additional kwargs to pass to the place_order method.
         """
         if payment_kwargs is None:
             payment_kwargs = {}
@@ -481,37 +490,58 @@ class PaymentDetailsView(OrderPlacementMixin, TemplateView):
         # checkouts (eg where we redirect to a 3rd party site and place
         # the order on a different request).
         order_number = self.generate_order_number(basket)
-        logger.info("Order #%s: beginning submission process for basket %d", order_number, basket.id)
+        logger.info("Order #%s: beginning submission process for basket #%d", order_number, basket.id)
 
+        # Freeze the basket so it cannot be manipulated while the customer is
+        # completing payment on a 3rd party site.  Also, store a reference to
+        # the basket in the session so that we know which basket to thaw if we
+        # get an unsuccessful payment response when redirecting to a 3rd party
+        # site.
         self.freeze_basket(basket)
         self.checkout_session.set_submitted_basket(basket)
 
         # Handle payment.  Any payment problems should be handled by the
         # handle_payment method raise an exception, which should be caught
         # within handle_POST and the appropriate forms redisplayed.
+        error_msg = _("A problem occurred while processing payment for this "
+                      "order.  No payment has been taken.  Please try again "
+                      "contact customer services if this problem persists")
+        pre_payment.send_robust(sender=self, view=self)
+        total_incl_tax, total_excl_tax = self.get_order_totals(basket)
         try:
-            pre_payment.send_robust(sender=self, view=self)
-            total_incl_tax, total_excl_tax = self.get_order_totals(basket)
             self.handle_payment(order_number, total_incl_tax, **payment_kwargs)
-            post_payment.send_robust(sender=self, view=self)
         except RedirectRequired, e:
             # Redirect required (eg PayPal, 3DS)
             logger.info("Order #%s: redirecting to %s", order_number, e.url)
             return HttpResponseRedirect(e.url)
         except UnableToTakePayment, e:
-            # Something went wrong with payment, need to show
-            # error to the user.  This type of exception is supposed
-            # to set a friendly error message.
+            # Something went wrong with payment but in an anticipated way.  Eg
+            # their bankcard has expired, wrong card number - that kind of
+            # thing. This type of exception is supposed to set a friendly error
+            # message that makes sense to the customer.
             msg = unicode(e)
             logger.warning("Order #%s: unable to take payment (%s) - restoring basket", order_number, msg)
             self.restore_frozen_basket()
             return self.render_to_response(self.get_context_data(error=msg))
         except PaymentError, e:
-            # Something went wrong which wasn't anticipated.
+            # A general payment error - Something went wrong which wasn't
+            # anticipated.  Eg, the payment gateway is down (it happens), your
+            # credentials are wrong - that king of thing.
+            # It makes sense to configure the checkout logger to
+            # mail admins on an error as this issue warrants some further
+            # investigation.
             msg = unicode(e)
             logger.error("Order #%s: payment error (%s)", order_number, msg)
             self.restore_frozen_basket()
-            return self.render_to_response(self.get_context_data(error="A problem occurred processing payment."))
+            return self.render_to_response(self.get_context_data(error=error_msg))
+        except Exception, e:
+            # Unhandled exception - hopefully, you will only ever see this in
+            # development.
+            logger.error("Order #%s: unhandled exception while taking payment (%s)", order_number, e)
+            logger.exception(e)
+            self.restore_frozen_basket()
+            return self.render_to_response(self.get_context_data(error=error_msg))
+        post_payment.send_robust(sender=self, view=self)
 
         # If all is ok with payment, try and place order
         logger.info("Order #%s: payment successful, placing order", order_number)
@@ -520,8 +550,10 @@ class PaymentDetailsView(OrderPlacementMixin, TemplateView):
                                                total_incl_tax, total_excl_tax,
                                                **order_kwargs)
         except UnableToPlaceOrder, e:
-            logger.warning("Order #%s: unable to place order - %s",
-                           order_number, e)
+            # It's possible that something will go wrong while trying to
+            # actually place an order.  Not a good situation to be in, but needs
+            # to be handled gracefully.
+            logger.error("Order #%s: unable to place order - %s", order_number, e)
             msg = unicode(e)
             self.restore_frozen_basket()
             return self.render_to_response(self.get_context_data(error=msg))
@@ -541,10 +573,15 @@ class PaymentDetailsView(OrderPlacementMixin, TemplateView):
 
     def handle_payment(self, order_number, total, **kwargs):
         """
-        Handle any payment processing.
+        Handle any payment processing and record payment sources and events.
 
         This method is designed to be overridden within your project.  The
-        default is to do nothing.
+        default is to do nothing as payment is domain-specific.
+
+        This method is responsible for handling payment and recording the
+        payment sources (using the add_payment_source method) and payment
+        events (using add_payment_event) so they can be
+        linked to the order when it is saved later on.
         """
         pass
 

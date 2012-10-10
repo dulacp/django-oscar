@@ -13,6 +13,7 @@ from django.contrib.auth import (authenticate, login as auth_login,
                                  logout as auth_logout)
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.sites.models import get_current_site
+from django.contrib.auth.models import User
 from django.conf import settings
 from django.db.models import get_model
 
@@ -24,6 +25,7 @@ EmailAuthenticationForm, EmailUserCreationForm, SearchByDateRangeForm = get_clas
                        'SearchByDateRangeForm'])
 ProfileForm = get_class('customer.forms', 'ProfileForm')
 UserAddressForm = get_class('address.forms', 'UserAddressForm')
+user_registered = get_class('customer.signals', 'user_registered')
 Order = get_model('order', 'Order')
 Line = get_model('basket', 'Line')
 Basket = get_model('basket', 'Basket')
@@ -31,6 +33,7 @@ UserAddress = get_model('address', 'UserAddress')
 Email = get_model('customer', 'email')
 UserAddress = get_model('address', 'UserAddress')
 CommunicationEventType = get_model('customer', 'communicationeventtype')
+ProductAlert = get_model('customer', 'ProductAlert')
 
 
 class LogoutView(RedirectView):
@@ -48,7 +51,7 @@ class LogoutView(RedirectView):
 
 class ProfileUpdateView(FormView):
     form_class = ProfileForm
-    template_name = 'customer/profile-form.html'
+    template_name = 'customer/profile_form.html'
 
     def get_form_kwargs(self):
         kwargs = super(ProfileUpdateView, self).get_form_kwargs()
@@ -69,12 +72,17 @@ class AccountSummaryView(TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super(AccountSummaryView, self).get_context_data(**kwargs)
+        # Delegate data fetching to separate methods so they are easy to
+        # override.
         ctx['addressbook_size'] = self.request.user.addresses.all().count()
         ctx['default_shipping_address'] = self.get_default_shipping_address(self.request.user)
         ctx['default_billing_address'] = self.get_default_billing_address(self.request.user)
-        ctx['emails'] = Email.objects.filter(user=self.request.user)
         ctx['orders'] = self.get_orders(self.request.user)
+        ctx['emails'] = self.get_emails(self.request.user)
+        ctx['alerts'] = self.get_product_alerts(self.request.user)
         self.add_profile_fields(ctx)
+
+        ctx['active_tab'] = self.request.GET.get('tab', 'profile')
         return ctx
 
     def get_orders(self, user):
@@ -103,6 +111,33 @@ class AccountSummaryView(TemplateView):
             })
         ctx['profile_fields'] = field_data
         ctx['profile'] = profile
+
+    def post(self, request, *args, **kwargs):
+        # A POST means an attempt to change the status of an alert
+        if 'cancel_alert' in request.POST:
+            return self.cancel_alert(request.POST.get('cancel_alert'))
+        return super(AccountSummaryView, self).post(request, *args, **kwargs)
+
+    def cancel_alert(self, alert_id):
+        try:
+            alert = ProductAlert.objects.get(user=self.request.user, pk=alert_id)
+        except ProductAlert.DoesNotExist:
+            messages.error(self.request, _("No alert found"))
+        else:
+            alert.cancel()
+            messages.success(self.request, _("Alert cancelled"))
+        return HttpResponseRedirect(
+            reverse('customer:summary')+'?tab=alerts'
+        )
+
+    def get_emails(self, user):
+        return Email.objects.filter(user=user)
+
+    def get_product_alerts(self, user):
+        return ProductAlert.objects.select_related().filter(
+            user=self.request.user,
+            date_closed=None,
+        )
 
     def get_default_billing_address(self, user):
         return self.get_user_address(user, is_default_for_billing=True)
@@ -194,18 +229,30 @@ class AccountRegistrationView(TemplateView):
         Register a new user from the data in *form*. If
         ``OSCAR_SEND_REGISTRATION_EMAIL`` is set to ``True`` a
         registration email will be send to the provided email address.
-        A new user account is created and the user is then logged
-        in.
+        A new user account is created and the user is then logged in.
         """
         user = form.save()
 
         if getattr(settings, 'OSCAR_SEND_REGISTRATION_EMAIL', True):
             self.send_registration_email(user)
 
-        user = authenticate(
-            username=user.email,
-            password=form.cleaned_data['password1']
-        )
+        user_registered.send_robust(sender=self, user=user)
+
+        try:
+            user = authenticate(
+                username=user.email,
+                password=form.cleaned_data['password1'])
+        except User.MultipleObjectsReturned:
+            # Handle race condition where the registration request is made
+            # multiple times in quick succession.  This leads to both requests
+            # passing the uniqueness check and creating users (as the first one
+            # hasn't committed when the second one runs the check).  We retain
+            # the first one and delete the dupes.
+            users = User.objects.filter(email=user.email)
+            user = users[0]
+            for u in users[1:]:
+                u.delete()
+
         auth_login(self.request, user)
         if self.request.session.test_cookie_worked():
             self.request.session.delete_test_cookie()
@@ -257,7 +304,7 @@ class AccountAuthView(AccountRegistrationView):
 class EmailHistoryView(ListView):
     """Customer email history"""
     context_object_name = "emails"
-    template_name = 'customer/email-history.html'
+    template_name = 'customer/email_list.html'
     paginate_by = 20
 
     def get_queryset(self):
@@ -270,9 +317,10 @@ class EmailDetailView(DetailView):
     template_name = "customer/email.html"
     context_object_name = 'email'
 
-    def get_object(self):
+    def get_object(self, queryset=None):
         """Return an order object or 404"""
-        return get_object_or_404(Email, user=self.request.user, id=self.kwargs['email_id'])
+        return get_object_or_404(Email, user=self.request.user,
+                                 id=self.kwargs['email_id'])
 
 
 class OrderHistoryView(ListView):
@@ -280,7 +328,7 @@ class OrderHistoryView(ListView):
     Customer order history
     """
     context_object_name = "orders"
-    template_name = 'customer/order-history.html'
+    template_name = 'customer/order_list.html'
     paginate_by = 20
     model = Order
     form_class = SearchByDateRangeForm
@@ -289,7 +337,8 @@ class OrderHistoryView(ListView):
         if 'date_from' in request.GET:
             self.form = SearchByDateRangeForm(self.request.GET)
             if not self.form.is_valid():
-                ctx = self.get_context_data()
+                self.object_list = self.get_queryset()
+                ctx = self.get_context_data(object_list=self.object_list)
                 return self.render_to_response(ctx)
         else:
             self.form = SearchByDateRangeForm()
@@ -297,7 +346,7 @@ class OrderHistoryView(ListView):
 
     def get_queryset(self):
         qs = self.model._default_manager.filter(user=self.request.user)
-        if self.form.is_bound:
+        if self.form.is_bound and self.form.is_valid():
             qs = qs.filter(**self.form.get_filters())
         return qs
 
@@ -314,8 +363,9 @@ class OrderDetailView(DetailView, PostActionMixin):
     def get_template_names(self):
         return ["customer/order.html"]
 
-    def get_object(self):
-        return get_object_or_404(self.model, user=self.request.user, number=self.kwargs['order_number'])
+    def get_object(self, queryset=None):
+        return get_object_or_404(self.model, user=self.request.user,
+                                 number=self.kwargs['order_number'])
 
     def do_reorder(self, order):
         """
@@ -381,9 +431,10 @@ class OrderDetailView(DetailView, PostActionMixin):
 class OrderLineView(DetailView, PostActionMixin):
     """Customer order line"""
 
-    def get_object(self):
+    def get_object(self, queryset=None):
         """Return an order object or 404"""
-        order = get_object_or_404(Order, user=self.request.user, number=self.kwargs['order_number'])
+        order = get_object_or_404(Order, user=self.request.user,
+                                  number=self.kwargs['order_number'])
         return order.lines.get(id=self.kwargs['line_id'])
 
     def do_reorder(self, line):
@@ -439,7 +490,7 @@ class OrderLineView(DetailView, PostActionMixin):
 class AddressListView(ListView):
     """Customer address book"""
     context_object_name = "addresses"
-    template_name = 'customer/address-book.html'
+    template_name = 'customer/address_list.html'
     paginate_by = 40
 
     def get_queryset(self):
@@ -450,10 +501,10 @@ class AddressListView(ListView):
 class AddressCreateView(CreateView):
     form_class = UserAddressForm
     mode = UserAddress
-    template_name = 'customer/address-form.html'
+    template_name = 'customer/address_form.html'
 
     def get_context_data(self, **kwargs):
-        ctx =  super(AddressCreateView, self).get_context_data(**kwargs)
+        ctx = super(AddressCreateView, self).get_context_data(**kwargs)
         ctx['title'] = _('Add a new address')
         return ctx
 
@@ -471,7 +522,7 @@ class AddressCreateView(CreateView):
 class AddressUpdateView(UpdateView):
     form_class = UserAddressForm
     model = UserAddress
-    template_name = 'customer/address-form.html'
+    template_name = 'customer/address_form.html'
 
     def get_context_data(self, **kwargs):
         ctx =  super(AddressUpdateView, self).get_context_data(**kwargs)
@@ -488,36 +539,31 @@ class AddressUpdateView(UpdateView):
 
 class AddressDeleteView(DeleteView):
     model = UserAddress
+    template_name = "customer/address_delete.html"
 
     def get_queryset(self):
-        """Return a customer's addresses"""
         return UserAddress._default_manager.filter(user=self.request.user)
 
     def get_success_url(self):
         return reverse('customer:address-list')
 
-    def get_template_names(self):
-        return ["customer/address-delete.html"]
-
 
 class AnonymousOrderDetailView(DetailView):
-
     model = Order
+    template_name = "customer/anon_order.html"
 
-    def get_template_names(self):
-        return ["customer/anon-order.html"]
-
-    def get_object(self):
-        order = get_object_or_404(self.model, user=None, number=self.kwargs['order_number'])
+    def get_object(self, queryset=None):
+        # Check URL hash matches that for order to prevent spoof attacks
+        order = get_object_or_404(self.model, user=None,
+                                  number=self.kwargs['order_number'])
         if self.kwargs['hash'] != order.verification_hash():
             raise Http404()
-
         return order
 
 
 class ChangePasswordView(FormView):
     form_class = PasswordChangeForm
-    template_name = 'customer/change-password.html'
+    template_name = 'customer/change_password_form.html'
 
     def get_form_kwargs(self):
         kwargs = super(ChangePasswordView, self).get_form_kwargs()

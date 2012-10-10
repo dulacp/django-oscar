@@ -15,6 +15,7 @@ ShippingAddress = get_model('order', 'ShippingAddress')
 CommunicationEvent = get_model('order', 'CommunicationEvent')
 PaymentEventType = get_model('order', 'PaymentEventType')
 PaymentEvent = get_model('order', 'PaymentEvent')
+PaymentEventQuantity = get_model('order', 'PaymentEventQuantity')
 UserAddress = get_model('address', 'UserAddress')
 Basket = get_model('basket', 'Basket')
 CommunicationEventType = get_model('customer', 'CommunicationEventType')
@@ -37,7 +38,8 @@ class OrderPlacementMixin(CheckoutSessionMixin):
     # Default code for the email to send after successful checkout
     communication_type_code = 'ORDER_PLACED'
 
-    def handle_order_placement(self, order_number, basket, total_incl_tax, total_excl_tax, **kwargs):
+    def handle_order_placement(self, order_number, basket, total_incl_tax,
+                               total_excl_tax, **kwargs):
         """
         Write out the order models and return the appropriate HTTP response
 
@@ -55,7 +57,7 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         self._payment_sources.append(source)
 
     def add_payment_event(self, event_type_name, amount):
-        event_type, n = PaymentEventType.objects.get_or_create(name=event_type_name)
+        event_type, __ = PaymentEventType.objects.get_or_create(name=event_type_name)
         if self._payment_events is None:
             self._payment_events = []
         event = PaymentEvent(event_type=event_type, amount=amount)
@@ -77,13 +79,16 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         # Save order id in session so thank-you page can load it
         self.request.session['checkout_order_id'] = order.id
 
-        return HttpResponseRedirect(reverse('checkout:thank-you'))
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse('checkout:thank-you')
 
     def place_order(self, order_number, basket, total_incl_tax, total_excl_tax, **kwargs):
         """
         Writes the order out to the DB including the payment models
         """
-        shipping_address = self.create_shipping_address()
+        shipping_address = self.create_shipping_address(basket)
         shipping_method = self.get_shipping_method(basket)
         billing_address = self.create_billing_address(shipping_address)
 
@@ -110,7 +115,7 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         self.save_payment_details(order)
         return order
 
-    def create_shipping_address(self):
+    def create_shipping_address(self, basket=None):
         """
         Create and returns the shipping address for the current order.
 
@@ -122,7 +127,9 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         If the shipping address was selected from the user's address book,
         then we convert the UserAddress to a ShippingAddress.
         """
-        if not self.request.basket.is_shipping_required():
+        if not basket:
+            basket = self.request.basket
+        if not basket.is_shipping_required():
             return None
 
         addr_data = self.checkout_session.new_shipping_address_fields()
@@ -192,6 +199,12 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         for event in self._payment_events:
             event.order = order
             event.save()
+        # We assume all lines are involved in the initial payment event
+        for line in order.lines.all():
+            PaymentEventQuantity.objects.create(
+                event=event,
+                line=line,
+                quantity=line.quantity)
 
     def save_payment_sources(self, order):
         """
@@ -245,7 +258,8 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         try:
             event_type = CommunicationEventType.objects.get(code=code)
         except CommunicationEventType.DoesNotExist:
-            # No event in database, attempt to find templates for this type
+            # No event-type in database, attempt to find templates for this type
+            # and render them immediately to get the messages
             messages = CommunicationEventType.objects.get_and_render(code, ctx)
             event_type = None
         else:
