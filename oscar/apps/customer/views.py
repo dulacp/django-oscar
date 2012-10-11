@@ -500,7 +500,7 @@ class AddressListView(ListView):
 
 class AddressCreateView(CreateView):
     form_class = UserAddressForm
-    mode = UserAddress
+    model = UserAddress
     template_name = 'customer/address_form.html'
 
     def get_context_data(self, **kwargs):
