@@ -1,8 +1,7 @@
-from decimal import Decimal as D, InvalidOperation
+import locale
 
 from django import template
 from django.conf import settings
-from babel.numbers import format_currency
 
 register = template.Library()
 
@@ -10,18 +9,23 @@ register = template.Library()
 @register.filter(name='currency')
 def currency(value):
     """
-    Format decimal value as currency
+    Return value converted to a locale currency
     """
     try:
-        value = D(value)
-    except (TypeError, InvalidOperation):
-        return u""
-    # Using Babel's currency formatting
-    # http://packages.python.org/Babel/api/babel.numbers-module.html#format_currency
-    kwargs = {
-        'currency': settings.OSCAR_DEFAULT_CURRENCY,
-        'format': getattr(settings, 'OSCAR_CURRENCY_FORMAT', None)}
-    locale = getattr(settings, 'OSCAR_CURRENCY_LOCALE', None)
-    if locale:
-        kwargs['locale'] = locale
-    return format_currency(value, **kwargs)
+        locale.setlocale(locale.LC_ALL, settings.LOCALE)
+    except AttributeError:
+        locale.setlocale(locale.LC_ALL, '')
+
+    # We allow the currency symbol to be overridden
+    symbol = getattr(settings, 'CURRENCY_SYMBOL', None)
+
+    try:
+        if symbol:
+            # And we allow the currency format to be overriden too
+            format = getattr(settings, 'CURRENCY_FORMAT', u"%(currency_symbol)s%(value_localized)s")
+            return format % {'currency_symbol':symbol, 'value_localized':locale.format("%.2f", value, grouping=True)}
+        else:
+            c = locale.currency(value, symbol=True, grouping=True)
+            return unicode(c, 'utf8')
+    except TypeError:
+        return '' 
