@@ -88,7 +88,7 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         """
         Writes the order out to the DB including the payment models
         """
-        shipping_address = self.create_shipping_address(basket)
+        shipping_address = self.create_shipping_address()
         shipping_method = self.get_shipping_method(basket)
         billing_address = self.create_billing_address(shipping_address)
 
