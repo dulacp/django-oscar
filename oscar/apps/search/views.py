@@ -28,7 +28,7 @@ class SuggestionsView(View):
         '''
         Creates a list of suggestions
         '''
-        query_term = self.request.GET['query_term'];
+        query_term = self.request.GET['term'];
         query_set = SearchQuerySet().filter(text__contains=query_term)[:self.suggest_limit]
         context = []
         for item in query_set:
