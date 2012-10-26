@@ -2,6 +2,7 @@ from django.conf.urls import patterns, url
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils.translation import ugettext_lazy as _
 
+from oscar.core.loading import get_class
 from oscar.core.application import Application
 from oscar.apps.dashboard.promotions import views
 from oscar.apps.promotions.conf import PROMOTION_CLASSES
@@ -24,11 +25,11 @@ class PromotionsDashboardApplication(Application):
 
     for klass in PROMOTION_CLASSES:
         locals()['create_%s_view' % klass.classname()] = \
-                getattr(views, 'Create%sView' % klass.__name__)
+                get_class('dashboard.promotions.views', 'Create%sView' % klass.__name__)
         locals()['update_%s_view' % klass.classname()] = \
-                getattr(views, 'Update%sView' % klass.__name__)
+                get_class('dashboard.promotions.views', 'Update%sView' % klass.__name__)
         locals()['delete_%s_view' % klass.classname()] = \
-                getattr(views, 'Delete%sView' % klass.__name__)
+                get_class('dashboard.promotions.views', 'Delete%sView' % klass.__name__)
 
     def get_urls(self):
         urlpatterns = patterns('',
