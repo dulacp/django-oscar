@@ -17,7 +17,40 @@ from oscar.apps.offer.abstract_models import AbstractConditionalOffer, AbstractC
 
 
 class ConditionalOffer(AbstractConditionalOffer):
-    pass
+    def _proxy_condition(self):
+        """
+        Returns the appropriate proxy model for the condition
+        """
+        field_dict = dict(self.condition.__dict__)
+        for field in field_dict.keys():
+            if field.startswith('_'):
+                del field_dict[field]
+
+        klassmap = {
+            self.condition.COUNT: CountCondition,
+            self.condition.VALUE: ValueCondition,
+            self.condition.COVERAGE: CoverageCondition}
+        if self.condition.type in klassmap:
+            return klassmap[self.condition.type](**field_dict)
+        return self.condition
+
+    def _proxy_benefit(self):
+        """
+        Returns the appropriate proxy model for the condition
+        """
+        field_dict = dict(self.benefit.__dict__)
+        for field in field_dict.keys():
+            if field.startswith('_'):
+                del field_dict[field]
+
+        klassmap = {
+            self.benefit.PERCENTAGE: PercentageDiscountBenefit,
+            self.benefit.FIXED: AbsoluteDiscountBenefit,
+            self.benefit.MULTIBUY: MultibuyDiscountBenefit,
+            self.benefit.FIXED_PRICE: FixedPriceBenefit}
+        if self.benefit.type in klassmap:
+            return klassmap[self.benefit.type](**field_dict)
+        return self.benefit
 
 class Condition(AbstractCondition):
     pass
