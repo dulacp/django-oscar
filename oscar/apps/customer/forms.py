@@ -230,7 +230,13 @@ class CleanEmailMixin(object):
             # about it
             return email
 
-        if self.instance and self.instance.id != user.id:
+        # because sometimes self.instance contains a UserProfile
+        if isinstance(self.instance, User):
+            user_instance = self.instance
+        else:
+            user_instance = self.instance.user
+
+        if user_instance and user_instance.id != user.id:
             raise ValidationError(
                 _("A user with this email address already exists")
             )
