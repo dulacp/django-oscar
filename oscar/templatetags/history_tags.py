@@ -24,7 +24,14 @@ def recently_viewed_products(context):
     except (ValueError, AttributeError):
         pass
 
-    product_dict = Product.browsable.in_bulk(product_ids)
+    product_dict = Product.browsable.select_related(
+            'product_class',
+            'stockrecord', 
+            'stockrecord__partner',
+        ).prefetch_related(
+            #'variants',
+            'images',
+        ).in_bulk(product_ids)
 
     # Reordering as the id order gets messed up in the query
     product_ids.reverse()
