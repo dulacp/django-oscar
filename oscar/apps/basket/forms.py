@@ -195,8 +195,10 @@ class AddToBasketForm(forms.Form):
         """
         Add the product option fields.
         """
-        for option in item.options:
-            self._add_option_field(item, option)
+        # Remove the call to options
+        # for option in item.options:
+        #     self._add_option_field(item, option)
+        pass
 
     def _add_option_field(self, item, option):
         """
