@@ -12,6 +12,8 @@ Category = get_model('catalogue', 'category')
 ProductAlertForm = get_class('customer.forms',
                              'ProductAlertForm')
 
+get_product_base_queryset = get_class('catalogue.utils', 'get_product_base_queryset')
+
 
 class ProductDetailView(DetailView):
     context_object_name = 'product'
@@ -70,24 +72,6 @@ class ProductDetailView(DetailView):
                  '%s/detail-for-class-%s.html' % (self.template_folder, product.product_class.name.lower()),
                  '%s/detail.html' % (self.template_folder)]
         return names
-
-
-def get_product_base_queryset():
-    """
-    Return ``QuerySet`` for product model with related
-    content pre-loaded. The ``QuerySet`` returns unfiltered
-    results for further filtering.
-    """
-    return Product.browsable.select_related(
-        'product_class',
-    ).prefetch_related(
-        'reviews',
-        'variants',
-        'product_options',
-        'product_class__options',
-        'stockrecord',
-        'images',
-    ).all()
 
 
 class ProductCategoryView(ListView):

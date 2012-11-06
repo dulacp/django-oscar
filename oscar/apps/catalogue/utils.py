@@ -18,6 +18,24 @@ Product = get_model('catalogue', 'product')
 ProductImage = get_model('catalogue', 'productimage')
 
 
+def get_product_base_queryset():
+    """
+    Return ``QuerySet`` for product model with related
+    content pre-loaded. The ``QuerySet`` returns unfiltered
+    results for further filtering.
+    """
+    return Product.browsable.select_related(
+        'product_class',
+    ).prefetch_related(
+        'reviews',
+        'variants',
+        'product_options',
+        'product_class__options',
+        'stockrecord',
+        'images',
+    ).all()
+    
+
 class Importer(object):
 
     allowed_extensions = ['.jpeg','.jpg','.gif','.png']
