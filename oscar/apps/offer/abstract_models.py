@@ -313,12 +313,10 @@ class AbstractBenefit(models.Model):
         :range: The range of products to use for filtering.  The fixed-price
         benefit ignores its range and uses the condition range
         """
-        if range is None:
-            range = self.range
         line_tuples = []
         for line in basket.all_lines():
             product = line.product
-            if (not range.contains(product) or
+            if (not self.range.contains(product) or
                 not self.can_apply_benefit(product)):
                 continue
             price = line.unit_price_incl_tax
@@ -352,6 +350,7 @@ class AbstractRange(models.Model):
     __included_product_ids = None
     __excluded_product_ids = None
     __class_ids = None
+    __included_categories = None
 
     class Meta:
         abstract = True
@@ -381,7 +380,7 @@ class AbstractRange(models.Model):
         included_product_ids = self._included_product_ids()
         if product.id in included_product_ids:
             return True
-        test_categories = self.included_categories.all()
+        test_categories = self._included_categories()
         if test_categories:
             for category in product.categories.all():
                 for test_category in test_categories:
@@ -406,6 +405,11 @@ class AbstractRange(models.Model):
         if None == self.__class_ids:
             self.__class_ids = [row['id'] for row in self.classes.values('id')]
         return self.__class_ids
+
+    def _included_categories(self):
+        if None == self._included_categories:
+            self.__included_categories = self.included_categories.all()
+        return self.__included_categories
 
     def num_products(self):
         if self.includes_all_products:

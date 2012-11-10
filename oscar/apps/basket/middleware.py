@@ -11,7 +11,16 @@ Basket = get_model('basket', 'basket')
 
 class BasketMiddleware(object):
 
+    _applicator = None
+
+    def get_applicator(self):
+        if self._applicator is None:
+            self._applicator = Applicator()
+        return self._applicator
+
     def process_request(self, request):
+        if request.path and request.path.startswith(settings.MEDIA_URL):
+            return
         request.cookies_to_delete = []
         basket = self.get_basket(request)
         self.apply_offers_to_basket(request, basket)
@@ -108,7 +117,7 @@ class BasketMiddleware(object):
 
     def apply_offers_to_basket(self, request, basket):
         if not basket.is_empty:
-            Applicator().apply(request, basket)
+            self.get_applicator().apply(request, basket)
 
     def get_basket_hash(self, basket_id):
         return str(zlib.crc32(str(basket_id) + settings.SECRET_KEY))

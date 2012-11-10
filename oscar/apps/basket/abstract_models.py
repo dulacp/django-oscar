@@ -81,7 +81,14 @@ class AbstractBasket(models.Model):
         if self.id is None:
             return query.EmptyQuerySet(model=self.__class__)
         if self._lines is None:
-            self._lines = self.lines.all()
+            self._lines = self.lines.all().select_related(
+                'product',
+                'product__product_class',
+                'product__stockrecord',
+                'product__stockrecord__partner'
+            ).prefetch_related(
+                'attributes'
+            )
         return self._lines
 
     def is_quantity_allowed(self, qty):
