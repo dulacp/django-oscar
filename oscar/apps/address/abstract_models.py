@@ -78,7 +78,7 @@ class AbstractAddress(models.Model):
             lambda x: x, [self.first_name, self.last_name,
                           self.line1, self.line2, self.line3, self.line4,
                           self.state, self.postcode, self.country.name])
-        self.search_text = ' '.join(search_fields)
+        self.search_text = u' '.join(search_fields)
 
     @property
     def summary(self):
