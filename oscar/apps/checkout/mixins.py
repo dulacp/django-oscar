@@ -63,7 +63,7 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         event = PaymentEvent(event_type=event_type, amount=amount)
         self._payment_events.append(event)
 
-    def handle_successful_order(self, order):
+    def handle_successful_order(self, order, send_confirmation_message=True):
         """
         Handle the various steps required after an order has been successfully placed.
 
@@ -71,7 +71,8 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         order is submitted.
         """
         # Send confirmation message (normally an email)
-        self.send_confirmation_message(order)
+        if send_confirmation_message:
+            self.send_confirmation_message(order)
 
         # Flush all session data
         self.checkout_session.flush()
