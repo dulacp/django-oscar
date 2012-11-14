@@ -324,25 +324,29 @@ class PaymentMethodView(CheckoutSessionMixin, TemplateView):
     between multiple sources.
     """
 
-    def get(self, request, *args, **kwargs):
+    def get_error_response(self):
         # Check that the user's basket is not empty
-        if request.basket.is_empty:
-            messages.error(request, _("You need to add some items to your basket to checkout"))
+        if self.request.basket.is_empty:
+            messages.error(self.request, _("You need to add some items to your basket to checkout"))
             return HttpResponseRedirect(reverse('basket:summary'))
 
-        shipping_required = request.basket.is_shipping_required()
+        shipping_required = self.request.basket.is_shipping_required()
 
         # Check that shipping address has been completed
         if shipping_required and not self.checkout_session.is_shipping_address_set():
-            messages.error(request, _("Please choose a shipping address"))
+            messages.error(self.request, _("Please choose a shipping address"))
             return HttpResponseRedirect(reverse('checkout:shipping-address'))
 
         # Check that shipping method has been set
         if shipping_required and not self.checkout_session.is_shipping_method_set():
-            messages.error(request, _("Please choose a shipping method"))
+            messages.error(self.request, _("Please choose a shipping method"))
             return HttpResponseRedirect(reverse('checkout:shipping-method'))
 
-        return self.get_success_response()
+    def get(self, request, *args, **kwargs):
+        error_response = self.get_error_response()
+        if error_response:
+            return error_response
+        return super(PaymentMethodView, self).get(request, *args, **kwargs)
 
     def get_success_response(self):
         return HttpResponseRedirect(reverse('checkout:payment-details'))

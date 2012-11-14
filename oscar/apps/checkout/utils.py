@@ -1,5 +1,6 @@
 from oscar.core.loading import get_class
 Repository = get_class('shipping.repository', 'Repository')
+NoShippingRequired = get_class('shipping.methods', 'NoShippingRequired')
 
 
 class CheckoutSessionData(object):
@@ -111,6 +112,12 @@ class CheckoutSessionData(object):
 
     # Shipping method
     # ===============
+
+    def is_shipping_method_a_not_required_instance(self):
+        """
+        Tell if the shipping method is a NoShippingRequired one
+        """
+        return isinstance(self.shipping_method(), NoShippingRequired)
 
     def use_free_shipping(self):
         """
