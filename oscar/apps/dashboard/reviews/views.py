@@ -41,7 +41,7 @@ class ReviewListView(generic.ListView, BulkEditMixin):
         items is created.
         """
         if not queryset:
-            self.model.objects.all()
+            super(ReviewListView, self).get_queryset()
 
         if date_from and date_to:
             # Add 24 hours to make search inclusive
@@ -67,7 +67,7 @@ class ReviewListView(generic.ListView, BulkEditMixin):
         return queryset
 
     def get_queryset(self):
-        queryset = self.model.objects.all()
+        queryset = super(ReviewListView, self).get_queryset()
         self.desc_ctx = {
             'main_filter': _('All reviews'),
             'date_filter': '',
@@ -116,7 +116,7 @@ class ReviewListView(generic.ListView, BulkEditMixin):
                 ).distinct()
             self.desc_ctx['name_filter'] = _(" with customer name matching '%s'") % data['name']
 
-        return queryset
+        return queryset.order_by('-date_created')
 
     def get_context_data(self, **kwargs):
         context = super(self.__class__, self).get_context_data(**kwargs)
