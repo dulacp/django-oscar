@@ -136,8 +136,10 @@ class OrderPlacementMixin(CheckoutSessionMixin):
         addr_data = self.checkout_session.new_shipping_address_fields()
         addr_id = self.checkout_session.user_address_id()
         if addr_data:
-            addr = self.create_shipping_address_from_form_fields(addr_data.copy()) # copy the dict to avoid modifying the session data
-            self.create_user_address(addr_data)
+            # copy the dict to avoid modifying the session data
+            cop_addr_data = addr_data.copy()
+            addr = self.create_shipping_address_from_form_fields(cop_addr_data) 
+            self.create_user_address(cop_addr_data)
         elif addr_id:
             addr = self.create_shipping_address_from_user_address(addr_id)
         else:
