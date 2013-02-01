@@ -555,7 +555,7 @@ class AbstractProductAttribute(models.Model):
     product_class = models.ForeignKey('catalogue.ProductClass', related_name='attributes', blank=True, null=True,
         verbose_name=_("Product Class"))
     name = models.CharField(_('Name'), max_length=128)
-    code = models.SlugField(_('Code'), max_length=128, validators=[RegexValidator(regex=r'^[a-zA-Z_][0-9a-zA-Z_]*$',
+    code = models.SlugField(_('Code'), max_length=128, validators=[RegexValidator(regex=r'^[a-zA-Z_][0-9a-zA-Z_-]*$',
         message=_("Code must match ^[a-zA-Z_][0-9a-zA-Z_]*$"))])
     type = models.CharField(choices=TYPE_CHOICES, default=TYPE_CHOICES[0][0], max_length=20, verbose_name=_("Type"))
     option_group = models.ForeignKey('catalogue.AttributeOptionGroup', blank=True, null=True,
